@@ -58,6 +58,7 @@
 #include <ripple/basics/make_lock.h>
 #include <beast/core/detail/base64.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <boost/asio/host_name.hpp>
 
 namespace ripple {
 
@@ -629,7 +630,7 @@ std::string
 NetworkOPsImp::getHostId (bool forAdmin)
 {
     if (forAdmin)
-        return beast::getComputerName ();
+        return hostname ();
 
     // For non-admin uses hash the node public key into a
     // single RFC1751 word:

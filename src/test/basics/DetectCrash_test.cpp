@@ -1,11 +1,7 @@
 //------------------------------------------------------------------------------
 /*
-    This file is part of Beast: https://github.com/vinniefalco/Beast
-    Copyright 2013, Vinnie Falco <vinnie.falco@gmail.com>
-
-    Portions of this file are from JUCE.
-    Copyright (c) 2013 - Raw Material Software Ltd.
-    Please visit http://www.juce.com
+    This file is part of rippled: https://github.com/ripple/rippled
+    Copyright (c) 2012, 2013 Ripple Labs Inc.
 
     Permission to use, copy, modify, and/or distribute this software for any
     purpose  with  or without fee is hereby granted, provided that the above
@@ -21,22 +17,30 @@
 */
 //==============================================================================
 
-namespace beast
-{
+#include <BeastConfig.h>
+#include <beast/unit_test/suite.hpp>
 
-void outputDebugString (std::string const& text)
-{
-    OutputDebugStringA ((text + "\n").c_str ());
-}
+#include <exception>
 
-//==============================================================================
-std::string getComputerName()
-{
-    char text [MAX_COMPUTERNAME_LENGTH + 2] = { 0 };
-    DWORD len = MAX_COMPUTERNAME_LENGTH + 1;
-    if (!GetComputerNameA (text, &len))
-        text[0] = 0;
-    return text;
-}
+namespace ripple {
+namespace test {
 
-} // beast
+struct DetectCrash_test : public beast::unit_test::suite
+{
+    void testDetectCrash ()
+    {
+        testcase ("Detect Crash");
+        // Kill the process. This is used to test that the multi-process
+        // unit test will correctly report the crash.
+        std::terminate();
+    }
+    void run() override
+    {
+        testDetectCrash();
+    }
+};
+
+BEAST_DEFINE_TESTSUITE_MANUAL(DetectCrash,unit_test,beast);
+
+} // test
+} // ripple

@@ -53,7 +53,7 @@
 
 #include <ripple/beast/core/LexicalCast.h>
 
-#include <ripple/beast/core/SystemStats.h>
+
 #include <ripple/beast/core/SemanticVersion.h>
 
 #if BEAST_MSVC
@@ -166,27 +166,10 @@
 #include <ripple/beast/core/osx_ObjCHelpers.h>
 #endif
 
-#if BEAST_ANDROID
-#include "native/android_JNIHelpers.h"
-#endif
+
 
 #if BEAST_MAC || BEAST_IOS
 #include <ripple/beast/core/mac_SystemStats.mm>
-
-#elif BEAST_WINDOWS
-#include <ripple/beast/core/win32_SystemStats.cpp>
-
-#elif BEAST_LINUX
-#include <ripple/beast/core/linux_SystemStats.cpp>
-
-#elif BEAST_BSD
-#include <ripple/beast/core/bsd_SystemStats.cpp>
-
-#elif BEAST_ANDROID
-#include "native/android_Files.cpp"
-#include "native/android_Misc.cpp"
-#include "native/android_SystemStats.cpp"
-#include "native/android_Threads.cpp"
 
 #endif
 
