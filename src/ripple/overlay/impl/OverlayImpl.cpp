@@ -899,12 +899,8 @@ OverlayImpl::send (protocol::TMValidation& m)
     });
 
     SerialIter sit (m.validation().data(), m.validation().size());
-    auto val = std::make_shared<STValidation>(
-        std::ref(sit),
-        [this](PublicKey const& pk) {
-            return calcNodeID(app_.validatorManifests().getMasterKey(pk));
-        },
-        false);
+    auto val = std::make_shared <
+        STValidation> (std::ref (sit), false);
     app_.getOPs().pubValidation (val);
 }
 

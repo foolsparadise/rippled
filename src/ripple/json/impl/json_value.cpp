@@ -779,7 +779,7 @@ Value::operator bool () const
     if (isString ())
     {
         auto s = asCString();
-        return s && s[0];
+        return s && strlen(s);
     }
 
     return ! (isArray() || isObject()) || size ();

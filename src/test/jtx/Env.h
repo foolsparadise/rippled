@@ -253,8 +253,6 @@ public:
     {
     }
 
-    virtual ~Env() = default;
-
     Application&
     app()
     {

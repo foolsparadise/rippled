@@ -21,6 +21,7 @@
 #define RIPPLE_PROTOCOL_TOKENS_H_INCLUDED
 
 #include <boost/optional.hpp>
+#include <vector>
 #include <cstdint>
 #include <string>
 
@@ -34,6 +35,7 @@ enum TokenType
     TOKEN_ACCOUNT_ID        = 0,
     TOKEN_ACCOUNT_PUBLIC    = 35,
     TOKEN_ACCOUNT_SECRET    = 34,
+    TOKEN_ACCOUNT_WIF       = 128,
     TOKEN_FAMILY_GENERATOR  = 41,
     TOKEN_FAMILY_SEED       = 33
 };
@@ -95,7 +97,7 @@ base58EncodeTokenBitcoin (std::uint8_t type,
     The type and checksum must match or an
     empty string is returned.
 */
-std::string
+std::vector<unsigned char>
 decodeBase58Token(
     std::string const& s, int type);
 
@@ -109,7 +111,7 @@ decodeBase58Token(
     base58 alphabet, so that a better error message
     may be returned.
 */
-std::string
+std::vector<unsigned char>
 decodeBase58TokenBitcoin(
     std::string const& s, int type);
 

@@ -30,12 +30,62 @@
 namespace ripple {
 
 static char rippleAlphabet[] =
-    "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz";
+//    "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz";
+    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 static char bitcoinAlphabet[] =
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 //------------------------------------------------------------------------------
+
+static const signed char phexdigit[256] =
+{ -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  0,1,2,3,4,5,6,7,8,9,-1,-1,-1,-1,-1,-1,
+  -1,0xa,0xb,0xc,0xd,0xe,0xf,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,0xa,0xb,0xc,0xd,0xe,0xf,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+  -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, };
+
+static
+std::vector<unsigned char> parseHex(const char* psz)
+{
+    // convert hex dump to vector
+    std::vector<unsigned char> vch;
+    for ( ; ; )
+    {
+        while (isspace(*psz))
+            psz++;
+        signed char c = phexdigit[(unsigned char)*psz++];
+        if (c == (signed char)-1)
+            break;
+        unsigned char n = (c << 4);
+        c = phexdigit[(unsigned char)*psz++];
+        if (c == (signed char)-1)
+            break;
+        n |= c;
+        vch.push_back(n);
+    }
+    return vch;
+}
+
+template <>
+boost::optional<std::vector<unsigned char> >
+parseHex(const std::string &str)
+{
+    if ((str.size() & 2) != 0)
+        return boost::none;
+    return parseHex(str.c_str());
+}
 
 template <class Hasher>
 static
@@ -151,18 +201,18 @@ std::string
 encodeToken (std::uint8_t type,
     void const* token, std::size_t size, bool btc)
 {
-    char buf[1024];
+    unsigned char buf[1024];
     // expanded token includes type + checksum
     auto const expanded = 1 + size + 4;
     // add scratch, log(256) / log(58), rounded up.
     auto const needed = expanded +
         size * (138 / 100 + 1);
-    std::unique_ptr<
-        char[]> pbuf;
+    std::unique_ptr<unsigned char[]> pbuf;
+    unsigned char* temp;
     char* temp;
     if (needed > sizeof(buf))
     {
-        pbuf.reset(new char[needed]);
+        pbuf.reset(new unsigned char[needed]);
         temp = pbuf.get();
     }
     else
@@ -202,7 +252,7 @@ base58EncodeTokenBitcoin (std::uint8_t type,
 // Modified from the original
 template <class InverseArray>
 static
-std::string
+std::vector<unsigned char>
 decodeBase58 (std::string const& s,
     InverseArray const& inv)
 {
@@ -241,7 +291,7 @@ decodeBase58 (std::string const& s,
     auto iter = std::find_if(
         b256.begin(), b256.end(),[](unsigned char c)
             { return c != 0; });
-    std::string result;
+    std::vector<unsigned char> result;
     result.reserve (zeroes + (b256.end() - iter));
     result.assign (zeroes, 0x00);
     while (iter != b256.end())
@@ -256,7 +306,7 @@ decodeBase58 (std::string const& s,
 */
 template <class InverseArray>
 static
-std::string
+std::vector<unsigned char>
 decodeBase58Token (std::string const& s,
     int type, InverseArray const& inv)
 {
@@ -266,9 +316,9 @@ decodeBase58Token (std::string const& s,
     // Reject zero length tokens
     if (result.size() < 6)
         return {};
-    if (result[0] != type)
+    if (static_cast<int>(result[0]) != type)
         return {};
-    std::array<char, 4> guard;
+    std::array<unsigned char, 4> guard;
     checksum(guard.data(),
         result.data(), result.size() - 4);
     if (std::memcmp(guard.data(),
@@ -313,7 +363,7 @@ static InverseAlphabet rippleInverse(rippleAlphabet);
 
 static InverseAlphabet bitcoinInverse(bitcoinAlphabet);
 
-std::string
+std::vector<unsigned char>
 decodeBase58Token(
     std::string const& s, int type)
 {
@@ -321,7 +371,7 @@ decodeBase58Token(
         s, type, rippleInverse);
 }
 
-std::string
+std::vector<unsigned char>
 decodeBase58TokenBitcoin(
     std::string const& s, int type)
 {

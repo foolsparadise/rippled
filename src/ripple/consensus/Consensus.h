@@ -1167,8 +1167,8 @@ Consensus<Adaptor>::closeLedger()
     result_->roundTime.reset(clock_.now());
     // Share the newly created transaction set if we haven't already
     // received it from a peer
-    if (acquired_.emplace(result_->txns.id(), result_->txns).second)
-        adaptor_.share(result_->txns);
+    if (acquired_.emplace(result_->set.id(), result_->set).second)
+        adaptor_.share(result_->set);
 
     if (mode_.get() == ConsensusMode::proposing)
         adaptor_.propose(result_->position);
@@ -1258,7 +1258,7 @@ Consensus<Adaptor>::updateOurPositions()
                     parms))
             {
                 if (!mutableSet)
-                    mutableSet.emplace(result_->txns);
+                    mutableSet.emplace(result_->set);
 
                 if (it.second.getOurVote())
                 {
@@ -1352,14 +1352,14 @@ Consensus<Adaptor>::updateOurPositions()
          result_->position.isStale(ourCutoff)))
     {
         // close time changed or our position is stale
-        ourNewSet.emplace(result_->txns);
+        ourNewSet.emplace(result_->set);
     }
 
     if (ourNewSet)
     {
         auto newID = ourNewSet->id();
 
-        result_->txns = std::move(*ourNewSet);
+        result_->set = std::move(*ourNewSet);
 
         JLOG(j_.info()) << "Position change: CTime "
                         << consensusCloseTime.time_since_epoch().count()
@@ -1369,16 +1369,16 @@ Consensus<Adaptor>::updateOurPositions()
 
         // Share our new transaction set and update disputes
         // if we haven't already received it
-        if (acquired_.emplace(newID, result_->txns).second)
+        if (acquired_.emplace(newID, result_->set).second)
         {
             if (!result_->position.isBowOut())
-                adaptor_.share(result_->txns);
+                adaptor_.share(result_->set);
 
             for (auto const& it : currPeerPositions_)
             {
                 Proposal_t const& p = it.second.proposal();
                 if (p.position() == newID)
-                    updateDisputes(it.first, result_->txns);
+                    updateDisputes(it.first, result_->set);
             }
         }
 
@@ -1479,13 +1479,13 @@ Consensus<Adaptor>::createDisputes(TxSet_t const& o)
         return;
 
     // Nothing to dispute if we agree
-    if (result_->txns.id() == o.id())
+    if (result_->set.id() == o.id())
         return;
 
-    JLOG(j_.debug()) << "createDisputes " << result_->txns.id() << " to "
+    JLOG(j_.debug()) << "createDisputes " << result_->set.id() << " to "
                      << o.id();
 
-    auto differences = result_->txns.compare(o);
+    auto differences = result_->set.compare(o);
 
     int dc = 0;
 
@@ -1494,10 +1494,10 @@ Consensus<Adaptor>::createDisputes(TxSet_t const& o)
         ++dc;
         // create disputed transactions (from the ledger that has them)
         assert(
-            (id.second && result_->txns.find(id.first) && !o.find(id.first)) ||
-            (!id.second && !result_->txns.find(id.first) && o.find(id.first)));
+            (id.second && result_->set.find(id.first) && !o.find(id.first)) ||
+            (!id.second && !result_->set.find(id.first) && o.find(id.first)));
 
-        Tx_t tx = id.second ? *result_->txns.find(id.first) : *o.find(id.first);
+        Tx_t tx = id.second ? *result_->set.find(id.first) : *o.find(id.first);
         auto txID = tx.id();
 
         if (result_->disputes.find(txID) != result_->disputes.end())
@@ -1505,7 +1505,7 @@ Consensus<Adaptor>::createDisputes(TxSet_t const& o)
 
         JLOG(j_.debug()) << "Transaction " << txID << " is disputed";
 
-        typename Result::Dispute_t dtx{tx, result_->txns.exists(txID),
+        typename Result::Dispute_t dtx{tx, result_->set.exists(txID),
          std::max(prevProposers_, currPeerPositions_.size()), j_};
 
         // Update all of the available peer's votes on the disputed transaction

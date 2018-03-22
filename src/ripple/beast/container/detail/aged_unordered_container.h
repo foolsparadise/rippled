@@ -161,7 +161,7 @@ private:
 
     // VFALCO TODO hoist to remove template argument dependencies
     class ValueHash
-        : private empty_base_optimization <Hash>
+        : private beast::detail::empty_base_optimization <Hash>
         , public std::unary_function <element, std::size_t>
     {
     public:
@@ -170,7 +170,7 @@ private:
         }
 
         ValueHash (Hash const& hash)
-            : empty_base_optimization <Hash> (hash)
+            : beast::detail::empty_base_optimization <Hash> (hash)
         {
         }
 
@@ -193,7 +193,7 @@ private:
     // Compares value_type against element, used in find/insert_check
     // VFALCO TODO hoist to remove template argument dependencies
     class KeyValueEqual
-        : private empty_base_optimization <KeyEqual>
+        : private beast::detail::empty_base_optimization <KeyEqual>
         , public std::binary_function <Key, element, bool>
     {
     public:
@@ -202,7 +202,7 @@ private:
         }
 
         KeyValueEqual (KeyEqual const& keyEqual)
-            : empty_base_optimization <KeyEqual> (keyEqual)
+            : beast::detail::empty_base_optimization <KeyEqual> (keyEqual)
         {
         }
 
@@ -283,7 +283,7 @@ private:
     class config_t
         : private ValueHash
         , private KeyValueEqual
-        , private empty_base_optimization <ElementAllocator>
+        , private beast::detail::empty_base_optimization <ElementAllocator>
     {
     public:
         explicit config_t (
@@ -311,7 +311,7 @@ private:
         config_t (
             clock_type& clock_,
             Allocator const& alloc_)
-            : empty_base_optimization <ElementAllocator> (alloc_)
+            : beast::detail::empty_base_optimization <ElementAllocator> (alloc_)
             , clock (clock_)
         {
         }
@@ -331,7 +331,7 @@ private:
             Hash const& hash,
             Allocator const& alloc_)
             : ValueHash (hash)
-            , empty_base_optimization <ElementAllocator> (alloc_)
+            , beast::detail::empty_base_optimization <ElementAllocator> (alloc_)
             , clock (clock_)
         {
         }
@@ -341,7 +341,7 @@ private:
             KeyEqual const& keyEqual,
             Allocator const& alloc_)
             : KeyValueEqual (keyEqual)
-            , empty_base_optimization <ElementAllocator> (alloc_)
+            , beast::detail::empty_base_optimization <ElementAllocator> (alloc_)
             , clock (clock_)
         {
         }
@@ -353,7 +353,7 @@ private:
             Allocator const& alloc_)
             : ValueHash (hash)
             , KeyValueEqual (keyEqual)
-            , empty_base_optimization <ElementAllocator> (alloc_)
+            , beast::detail::empty_base_optimization <ElementAllocator> (alloc_)
             , clock (clock_)
         {
         }
@@ -361,7 +361,7 @@ private:
         config_t (config_t const& other)
             : ValueHash (other.hash_function())
             , KeyValueEqual (other.key_eq())
-            , empty_base_optimization <ElementAllocator> (
+            , beast::detail::empty_base_optimization <ElementAllocator> (
                 ElementAllocatorTraits::
                     select_on_container_copy_construction (
                         other.alloc()))
@@ -372,7 +372,7 @@ private:
         config_t (config_t const& other, Allocator const& alloc)
             : ValueHash (other.hash_function())
             , KeyValueEqual (other.key_eq())
-            , empty_base_optimization <ElementAllocator> (alloc)
+            , beast::detail::empty_base_optimization <ElementAllocator> (alloc)
             , clock (other.clock)
         {
         }
@@ -380,7 +380,7 @@ private:
         config_t (config_t&& other)
             : ValueHash (std::move (other.hash_function()))
             , KeyValueEqual (std::move (other.key_eq()))
-            , empty_base_optimization <ElementAllocator> (
+            , beast::detail::empty_base_optimization <ElementAllocator> (
                 std::move (other.alloc()))
             , clock (other.clock)
         {
@@ -389,7 +389,7 @@ private:
         config_t (config_t&& other, Allocator const& alloc)
             : ValueHash (std::move (other.hash_function()))
             , KeyValueEqual (std::move (other.key_eq()))
-            , empty_base_optimization <ElementAllocator> (alloc)
+            , beast::detail::empty_base_optimization <ElementAllocator> (alloc)
             , clock (other.clock)
         {
         }
@@ -454,13 +454,13 @@ private:
 
         ElementAllocator& alloc()
         {
-            return empty_base_optimization <
+            return beast::detail::empty_base_optimization <
                 ElementAllocator>::member();
         }
 
         ElementAllocator const& alloc() const
         {
-            return empty_base_optimization <
+            return beast::detail::empty_base_optimization <
                 ElementAllocator>::member();
         }
 

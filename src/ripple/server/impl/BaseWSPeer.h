@@ -28,6 +28,7 @@
 #include <beast/core/multi_buffer.hpp>
 #include <beast/http/message.hpp>
 #include <cassert>
+#include <functional>
 
 namespace ripple {
 
@@ -58,7 +59,7 @@ private:
     bool ping_active_ = false;
     beast::websocket::ping_data payload_;
     error_code ec_;
-
+    std::function<void (beast::websocket::frame_type , beast::string_view)> control_callback_;
 public:
     template<class Body, class Headers>
     BaseWSPeer(
@@ -180,6 +181,7 @@ run()
         return strand_.post(std::bind(
             &BaseWSPeer::run, impl().shared_from_this()));
     impl().ws_.set_option(port().pmd_options);
+    // Must manage the control callback memory outside of the `control_callback` function
     impl().ws_.control_callback(
         std::bind(&BaseWSPeer::on_ping_pong, this,
             std::placeholders::_1, std::placeholders::_2));

@@ -27,6 +27,7 @@
 #include <ripple/ledger/ReadView.h>
 #include <ripple/net/InfoSub.h>
 #include <ripple/protocol/STValidation.h>
+#include <boost/asio.hpp>
 #include <boost/asio/io_service.hpp>
 #include <memory>
 #include <deque>
@@ -153,7 +154,8 @@ public:
 
     // ledger proposal/close functions
     virtual void processTrustedProposal (RCLCxPeerPos peerPos,
-        std::shared_ptr<protocol::TMProposeSet> set) = 0;
+        std::shared_ptr<protocol::TMProposeSet> set,
+            NodeID const& node) = 0;
 
     virtual bool recvValidation (STValidation::ref val,
         std::string const& source) = 0;

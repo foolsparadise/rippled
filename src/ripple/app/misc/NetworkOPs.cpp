@@ -53,11 +53,11 @@
 #include <ripple/resource/ResourceManager.h>
 #include <ripple/beast/rfc2616.h>
 #include <ripple/beast/core/LexicalCast.h>
+#include <ripple/beast/core/SystemStats.h>
 #include <ripple/beast/utility/rngfill.h>
 #include <ripple/basics/make_lock.h>
 #include <beast/core/detail/base64.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/asio/ip/host_name.hpp>
 
 namespace ripple {
 
@@ -293,7 +293,8 @@ public:
     // Ledger proposal/close functions.
     void processTrustedProposal (
         RCLCxPeerPos proposal,
-        std::shared_ptr<protocol::TMProposeSet> set) override;
+        std::shared_ptr<protocol::TMProposeSet> set,
+        NodeID const &node) override;
 
     bool recvValidation (
         STValidation::ref val, std::string const& source) override;
@@ -627,10 +628,8 @@ NetworkOPsImp::StateAccounting::states_ = {{
 std::string
 NetworkOPsImp::getHostId (bool forAdmin)
 {
-    static std::string const hostname = boost::asio::ip::host_name();
-
     if (forAdmin)
-        return hostname;
+        return beast::getComputerName ();
 
     // For non-admin uses hash the node public key into a
     // single RFC1751 word:
@@ -1435,17 +1434,13 @@ bool NetworkOPsImp::beginConsensus (uint256 const& networkClosed)
     assert (closingInfo.parentHash ==
             m_ledgerMaster.getClosedLedger()->info().hash);
 
-    TrustChanges const changes = app_.validators().updateTrusted(
-        app_.getValidations().getCurrentNodeIDs());
+    app_.validators().onConsensusStart (
+        app_.getValidations().getCurrentPublicKeys ());
 
-    if (!changes.added.empty() || !changes.removed.empty())
-        app_.getValidations().trustChanged(changes.added, changes.removed);
-
-    mConsensus.startRound(
+    mConsensus.startRound (
         app_.timeKeeper().closeTime(),
         networkClosed,
-        prevLedger,
-        changes.removed);
+        prevLedger);
 
     JLOG(m_journal.debug()) << "Initiating consensus engine";
     return true;
@@ -1458,7 +1453,8 @@ uint256 NetworkOPsImp::getConsensusLCL ()
 
 void NetworkOPsImp::processTrustedProposal (
     RCLCxPeerPos peerPos,
-    std::shared_ptr<protocol::TMProposeSet> set)
+    std::shared_ptr<protocol::TMProposeSet> set,
+    NodeID const& node)
 {
     if (mConsensus.peerProposal(
             app_.timeKeeper().closeTime(), peerPos))

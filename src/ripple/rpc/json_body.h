@@ -21,6 +21,8 @@
 #define RIPPLE_RPC_JSON_BODY_H
 
 #include <ripple/json/json_value.h>
+#include <ripple/json/to_string.h>
+
 #include <beast/core/multi_buffer.hpp>
 #include <beast/http/message.hpp>
 
@@ -70,6 +72,37 @@ struct json_body
         void
         finish(beast::error_code&)
         {
+        }
+    };
+
+    class writer
+    {
+        std::string body_string_;
+
+    public:
+        using const_buffers_type =
+            boost::asio::const_buffer;
+
+        template<bool isRequest, class Fields>
+        explicit
+        writer(beast::http::message<isRequest,
+                json_body, Fields> const& msg)
+                : body_string_(to_string(msg.body()))
+        {
+        }
+
+        void
+        init(beast::error_code& ec)
+        {
+            ec.assign(0, ec.category());
+        }
+
+        boost::optional<std::pair<const_buffers_type, bool>>
+        get(beast::error_code& ec)
+        {
+            ec.assign(0, ec.category());
+            return {{const_buffers_type{
+                body_string_.data(), body_string_.size()}, false}};
         }
     };
 };

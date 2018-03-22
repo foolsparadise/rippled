@@ -22,6 +22,7 @@
 
 #include <ripple/basics/Log.h>
 #include <ripple/protocol/PublicKey.h>
+#include <ripple/protocol/SecretKey.h>
 #include <ripple/protocol/STObject.h>
 #include <ripple/protocol/SecretKey.h>
 #include <cstdint>
@@ -64,138 +65,70 @@ public:
 
         @note Throws if the object is not valid
     */
-    template <class LookupNodeID>
-    STValidation(
-        SerialIter& sit,
-        LookupNodeID&& lookupNodeID,
-        bool checkSignature)
-        : STObject(getFormat(), sit, sfValidation)
-    {
-        mNodeID =
-            lookupNodeID(PublicKey(makeSlice(getFieldVL(sfSigningPubKey))));
-        assert(mNodeID.isNonZero());
-
-        if (checkSignature && !isValid())
-        {
-            JLOG(debugLog().error()) << "Invalid validation" << getJson(0);
-            Throw<std::runtime_error>("Invalid validation");
-        }
-    }
-
-    /** Construct a new STValidation
-
-        Constructs a new STValidation issued by a node. The instance should be
-        signed before sharing with other nodes.
-
-        @param ledgerHash The hash of the validated ledger
-        @param consensusHash The hash of the consensus transaction set
-        @param signTime When the validation is signed
-        @param publicKey The current signing public key
-        @param nodeID ID corresponding to node's public master key
-        @param isFull Whether the validation is full or partial
-
-    */
-
-    STValidation(
-        uint256 const& ledgerHash,
-        uint256 const& consensusHash,
-        NetClock::time_point signTime,
-        PublicKey const& publicKey,
-        NodeID const& nodeID,
-        bool isFull);
-
+    // These throw if the object is not valid
+    STValidation (SerialIter & sit, bool checkSignature = true);
+    
+    // Does not sign the validation
+    STValidation (
+                  uint256 const& ledgerHash,
+                  NetClock::time_point signTime,
+                  PublicKey const& raPub,
+                  bool isFull);
+    
     STBase*
-    copy(std::size_t n, void* buf) const override
+    copy (std::size_t n, void* buf) const override
     {
         return emplace(n, buf, *this);
     }
-
+    
     STBase*
-    move(std::size_t n, void* buf) override
+    move (std::size_t n, void* buf) override
     {
         return emplace(n, buf, std::move(*this));
     }
-
-    // Hash of the validated ledger
-    uint256
-    getLedgerHash() const;
-
-    // Hash of consensus transaction set used to generate ledger
-    uint256
-    getConsensusHash() const;
-
-    NetClock::time_point
-    getSignTime() const;
-
-    NetClock::time_point
-    getSeenTime() const;
-
-    std::uint32_t
-    getFlags() const;
-
-    PublicKey
-    getSignerPublic() const;
-
-    NodeID
-    getNodeID() const
+    
+    uint256         getLedgerHash ()     const;
+    NetClock::time_point getSignTime ()  const;
+    NetClock::time_point getSeenTime ()  const;
+    std::uint32_t   getFlags ()          const;
+    PublicKey       getSignerPublic ()   const;
+    NodeID          getNodeID ()         const
     {
         return mNodeID;
     }
-
-    bool
-    isValid() const;
-
-    bool
-    isFull() const;
-
-    bool
-    isTrusted() const
+    bool            isValid ()           const;
+    bool            isFull ()            const;
+    bool            isTrusted ()         const
     {
         return mTrusted;
     }
-
-    uint256
-    getSigningHash() const;
-
-    bool
-    isValid(uint256 const&) const;
-
-    void
-    setTrusted()
+    uint256         getSigningHash ()    const;
+    bool            isValid (uint256 const& ) const;
+    
+    void            setTrusted ()
     {
         mTrusted = true;
     }
-
-    void
-    setUntrusted()
-    {
-        mTrusted = false;
-    }
-
-    void
-    setSeen(NetClock::time_point s)
+    void            setSeen (NetClock::time_point s)
     {
         mSeen = s;
     }
-
-    Blob
-    getSerialized() const;
-
-    Blob
-    getSignature() const;
-
+    Blob    getSerialized ()             const;
+    Blob    getSignature ()              const;
+    
     // Signs the validation and returns the signing hash
-    uint256
-    sign(SecretKey const& secretKey);
-
+    uint256 sign (SecretKey const& secretKey);
+    
 private:
-    static SOTemplate const&
-    getFormat();
-
+    static SOTemplate const& getFormat ();
+    
+    void setNode ();
+    
     NodeID mNodeID;
     bool mTrusted = false;
     NetClock::time_point mSeen = {};
 };
+
 
 } // ripple
 

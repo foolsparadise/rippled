@@ -35,10 +35,10 @@ class SimpleWriter : public Writer
     beast::multi_buffer sb_;
 
 public:
-    template<bool isRequest, class Body, class Headers>
+    template<bool isRequest, class Body, class Fields>
     explicit
     SimpleWriter(beast::http::message<
-        isRequest, Body, Headers> const& msg)
+        isRequest, Body, Fields> const& msg)
     {
         beast::ostream(sb_) << msg;
     }

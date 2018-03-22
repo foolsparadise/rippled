@@ -80,6 +80,7 @@ class Ledger::sles_iter_impl
     : public sles_type::iter_base
 {
 private:
+    ReadView const* view_;
     SHAMap::const_iterator iter_;
 
 public:
@@ -88,8 +89,10 @@ public:
 
     sles_iter_impl (sles_iter_impl const&) = default;
 
-    sles_iter_impl (SHAMap::const_iterator iter)
-        : iter_ (iter)
+    sles_iter_impl (SHAMap::const_iterator iter,
+            ReadView const& view)
+        : view_ (&view)
+        , iter_ (iter)
     {
     }
 
@@ -131,6 +134,7 @@ class Ledger::txs_iter_impl
 {
 private:
     bool metadata_;
+    ReadView const* view_;
     SHAMap::const_iterator iter_;
 
 public:
@@ -139,9 +143,12 @@ public:
 
     txs_iter_impl (txs_iter_impl const&) = default;
 
-    txs_iter_impl(bool metadata,
-        SHAMap::const_iterator iter)
-        : metadata_(metadata), iter_(iter)
+    txs_iter_impl (bool metadata,
+        SHAMap::const_iterator iter,
+            ReadView const& view)
+        : metadata_ (metadata)
+        , view_ (&view)
+        , iter_ (iter)
     {
     }
 
@@ -451,35 +458,43 @@ auto
 Ledger::slesBegin() const ->
     std::unique_ptr<sles_type::iter_base>
 {
-    return std::make_unique<sles_iter_impl>(stateMap_->begin());
+    return std::make_unique<
+        sles_iter_impl>(
+            stateMap_->begin(), *this);
 }
 
 auto
 Ledger::slesEnd() const ->
     std::unique_ptr<sles_type::iter_base>
 {
-    return std::make_unique<sles_iter_impl>(stateMap_->end());
+    return std::make_unique<
+        sles_iter_impl>(
+            stateMap_->end(), *this);
 }
 
 auto
 Ledger::slesUpperBound(uint256 const& key) const ->
     std::unique_ptr<sles_type::iter_base>
 {
-    return std::make_unique<sles_iter_impl>(stateMap_->upper_bound(key));
+    return std::make_unique<
+        sles_iter_impl>(
+            stateMap_->upper_bound(key), *this);
 }
 
 auto
 Ledger::txsBegin() const ->
     std::unique_ptr<txs_type::iter_base>
 {
-    return std::make_unique<txs_iter_impl>(!open(), txMap_->begin());
+    return std::make_unique<txs_iter_impl>(
+        !open(), txMap_->begin(), *this);
 }
 
 auto
 Ledger::txsEnd() const ->
     std::unique_ptr<txs_type::iter_base>
 {
-    return std::make_unique<txs_iter_impl>(!open(), txMap_->end());
+    return std::make_unique<txs_iter_impl>(
+        !open(), txMap_->end(), *this);
 }
 
 bool

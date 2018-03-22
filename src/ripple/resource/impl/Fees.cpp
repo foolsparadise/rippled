@@ -19,7 +19,7 @@
 
 #include <BeastConfig.h>
 #include <ripple/resource/Fees.h>
-
+#include <ripple/resource/Charge.h>
 namespace ripple {
 namespace Resource {
 

@@ -334,6 +334,7 @@ ServerHandlerImp::onWSMessage(
     auto const size = boost::asio::buffer_size(buffers);
     if (size > RPC::Tuning::maxRequestSize ||
         ! Json::Reader{}.parse(jv, buffers) ||
+        ! jv ||
         ! jv.isObject())
     {
         Json::Value jvResult(Json::objectValue);
@@ -566,7 +567,7 @@ ServerHandlerImp::processRequest (Port const& port,
         if ((request.size () > RPC::Tuning::maxRequestSize) ||
             ! reader.parse (request, jsonOrig) ||
             ! jsonOrig ||
-            ! jsonOrig.isObject ())
+            ! (jsonOrig.isObject () || jsonOrig.isArray()))
         {
             HTTPReply (400, "Unable to parse request: " +
                        reader.getFormatedErrorMessages(), output, rpcJ);
@@ -579,6 +580,7 @@ ServerHandlerImp::processRequest (Port const& port,
     if (jsonOrig.isMember(jss::method) && jsonOrig[jss::method] == "batch")
     {
         batch = true;
+    auto size = batch ? jsonOrig[jss::params].size() : 1;
         if(!jsonOrig.isMember(jss::params) || !jsonOrig[jss::params].isArray())
         {
             HTTPReply (400, "Malformed batch request", output, rpcJ);
@@ -594,8 +596,12 @@ ServerHandlerImp::processRequest (Port const& port,
         Json::Value const& jsonRPC =
             batch ? jsonOrig[jss::params][i] : jsonOrig;
         /* ------------------------------------------------------------------ */
+        // Determine role/usage so we can charge for invalid requests
+        Json::Value const& method = jsonRPC [jss::method];
+
         auto role = Role::FORBID;
-        auto required = Role::FORBID;
+        //auto required = Role::FORBID;
+        auto required = RPC::roleRequired(method.asString());
         if (jsonRPC.isMember(jss::method) && jsonRPC[jss::method].isString())
             required = RPC::roleRequired(jsonRPC[jss::method].asString());
 

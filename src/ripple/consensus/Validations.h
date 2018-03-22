@@ -151,6 +151,8 @@ isCurrent(
 enum class ValStatus {
     /// This was a new validation and was added
     current,
+    /// Already had this validation for this ID but different seq
+    repeatID,
     /// Not current or was older than current from this node
     stale,
     /// A validation violates the increasing seq requirement
@@ -164,6 +166,8 @@ to_string(ValStatus m)
     {
         case ValStatus::current:
             return "current";
+        case ValStatus::repeatID:
+            return "repeatID";
         case ValStatus::stale:
             return "stale";
         case ValStatus::badSeq:
@@ -253,7 +257,7 @@ to_string(ValStatus m)
         void onStale(Validation && );
 
         // Flush the remaining validations (typically done on shutdown)
-        void flush(hash_map<NodeID,Validation> && remaining);
+        void flush(hash_map<NodeKey,Validation> && remaining);
 
         // Return the current network time (used to determine staleness)
         NetClock::time_point now() const;
@@ -275,7 +279,7 @@ class Validations
     using Ledger = typename Adaptor::Ledger;
     using ID = typename Ledger::ID;
     using Seq = typename Ledger::Seq;
-    using NodeID = typename Validation::NodeID;
+    using NodeKey = typename Validation::NodeKey;
 
     using WrappedValidationType = std::decay_t<
         std::result_of_t<decltype (&Validation::unwrap)(Validation)>>;
@@ -286,18 +290,18 @@ class Validations
     mutable Mutex mutex_;
 
     // Validations from currently listed and trusted nodes (partial and full)
-    hash_map<NodeID, Validation> current_;
+    hash_map<NodeKey, Validation> current_;
 
     // Used to enforce the largest validation invariant for the local node
     SeqEnforcer<Seq> localSeqEnforcer_;
 
     // Sequence of the largest validation received from each node
-    hash_map<NodeID, SeqEnforcer<Seq>> seqEnforcers_;
+    hash_map<NodeKey, SeqEnforcer<Seq>> seqEnforcers_;
 
     //! Validations from listed nodes, indexed by ledger id (partial and full)
     beast::aged_unordered_map<
         ID,
-        hash_map<NodeID, Validation>,
+        hash_map<NodeKey, Validation>,
         std::chrono::steady_clock,
         beast::uhash<>>
         byLedger_;
@@ -307,10 +311,10 @@ class Validations
 
     // Last (validated) ledger successfully acquired. If in this map, it is
     // accounted for in the trie.
-    hash_map<NodeID, Ledger> lastLedger_;
+    hash_map<NodeKey, Ledger> lastLedger_;
 
     // Set of ledgers being acquired from the network
-    hash_map<std::pair<Seq,ID>, hash_set<NodeID>> acquiring_;
+    hash_map<std::pair<Seq,ID>, hash_set<NodeKey>> acquiring_;
 
     // Parameters to determine validation staleness
     ValidationParms const parms_;
@@ -322,23 +326,23 @@ class Validations
 private:
     // Remove support of a validated ledger
     void
-    removeTrie(ScopedLock const&, NodeID const& nodeID, Validation const& val)
+    removeTrie(ScopedLock const&, NodeKey const& key, Validation const& val)
     {
         {
             auto it = acquiring_.find(std::make_pair(val.seq(), val.ledgerID()));
             if (it != acquiring_.end())
             {
-                it->second.erase(nodeID);
+                it->second.erase(key);
                 if (it->second.empty())
                     acquiring_.erase(it);
             }
         }
         {
-            auto it = lastLedger_.find(nodeID);
+            auto it = lastLedger_.find(key);
             if (it != lastLedger_.end() && it->second.id() == val.ledgerID())
             {
                 trie_.remove(it->second);
-                lastLedger_.erase(nodeID);
+                lastLedger_.erase(key);
             }
         }
     }
@@ -352,8 +356,8 @@ private:
             if (boost::optional<Ledger> ledger =
                     adaptor_.acquire(it->first.second))
             {
-                for (NodeID const& nodeID : it->second)
-                    updateTrie(lock, nodeID, *ledger);
+                for (NodeKey const& key : it->second)
+                    updateTrie(lock, key, *ledger);
 
                 it = acquiring_.erase(it);
             }
@@ -364,9 +368,9 @@ private:
 
     // Update the trie to reflect a new validated ledger
     void
-    updateTrie(ScopedLock const&, NodeID const& nodeID, Ledger ledger)
+    updateTrie(ScopedLock const&, NodeKey const& key, Ledger ledger)
     {
-        auto ins = lastLedger_.emplace(nodeID, ledger);
+        auto ins = lastLedger_.emplace(key, ledger);
         if (!ins.second)
         {
             trie_.remove(ins.first->second);
@@ -383,16 +387,16 @@ private:
         node remains.
 
         @param lock Existing lock of mutex_
-        @param nodeID The node identifier of the validating node
+        @param key The master public key identifying the validating node
         @param val The trusted validation issued by the node
         @param prior If not none, the last current validated ledger Seq,ID of key
     */
     void
     updateTrie(
         ScopedLock const& lock,
-        NodeID const& nodeID,
+        NodeKey const& key,
         Validation const& val,
-        boost::optional<std::pair<Seq, ID>> prior)
+        boost::optional<std::pair<Seq,ID>> prior)
     {
         assert(val.trusted());
 
@@ -402,7 +406,7 @@ private:
             auto it = acquiring_.find(*prior);
             if (it != acquiring_.end())
             {
-                it->second.erase(nodeID);
+                it->second.erase(key);
                 if (it->second.empty())
                     acquiring_.erase(it);
             }
@@ -410,20 +414,20 @@ private:
 
         checkAcquired(lock);
 
-        std::pair<Seq, ID> valPair{val.seq(), val.ledgerID()};
+        std::pair<Seq,ID> valPair{val.seq(),val.ledgerID()};
         auto it = acquiring_.find(valPair);
-        if (it != acquiring_.end())
+        if(it != acquiring_.end())
         {
-            it->second.insert(nodeID);
+            it->second.insert(key);
         }
         else
         {
-            if (boost::optional<Ledger> ledger =
-                    adaptor_.acquire(val.ledgerID()))
-                updateTrie(lock, nodeID, *ledger);
+            if (boost::optional<Ledger> ledger = adaptor_.acquire(val.ledgerID()))
+                updateTrie(lock, key, *ledger);
             else
-                acquiring_[valPair].insert(nodeID);
+                acquiring_[valPair].insert(key);
         }
+
     }
 
     /** Use the trie for a calculation
@@ -455,7 +459,7 @@ private:
         @param lock Existing lock of mutex_
         @param pre Invokable with signature (std::size_t) called prior to
                    looping.
-        @param f Invokable with signature (NodeID const &, Validations const &)
+        @param f Invokable with signature (NodeKey const &, Validations const &)
                  for each current validation.
 
         @note The invokable `pre` is called _prior_ to checking for staleness
@@ -496,7 +500,7 @@ private:
         @param lock Existing lock on mutex_
         @param ledgerID The identifier of the ledger
         @param pre Invokable with signature(std::size_t)
-        @param f Invokable with signature (NodeID const &, Validation const &)
+        @param f Invokable with signature (NodeKey const &, Validation const &)
 
         @note The invokable `pre` is called prior to iterating validations. The
               argument is the number of times `f` will be called.
@@ -521,7 +525,7 @@ private:
 public:
     /** Constructor
 
-        @param p ValidationParms to control staleness/expiration of validations
+        @param p ValidationParms to control staleness/expiration of validaitons
         @param c Clock to use for expiring validations stored by ledger
         @param ts Parameters for constructing Adaptor instance
     */
@@ -568,12 +572,15 @@ public:
 
         Attempt to add a new validation.
 
-        @param nodeID The identity of the node issuing this validation
+        @param key The master key associated with this validation
         @param val The validation to store
         @return The outcome
+
+        @note The provided key may differ from the validation's  key()
+              member if the validator is using ephemeral signing keys.
     */
     ValStatus
-    add(NodeID const& nodeID, Validation const& val)
+    add(NodeKey const& key, Validation const& val)
     {
         if (!isCurrent(parms_, adaptor_.now(), val.signTime(), val.seenTime()))
             return ValStatus::stale;
@@ -584,16 +591,17 @@ public:
             // Check that validation sequence is greater than any non-expired
             // validations sequence from that validator
             auto const now = byLedger_.clock().now();
-            SeqEnforcer<Seq>& enforcer = seqEnforcers_[nodeID];
+            SeqEnforcer<Seq>& enforcer = seqEnforcers_[key];
             if (!enforcer(now, val.seq(), parms_))
                 return ValStatus::badSeq;
 
-            // Use insert_or_assign when C++17 supported
-            auto ret = byLedger_[val.ledgerID()].emplace(nodeID, val);
-            if (!ret.second)
-                ret.first->second = val;
+            // This validation is a repeat if we already have
+            // one with the same id for this key
+            auto const ret = byLedger_[val.ledgerID()].emplace(key, val);
+            if (!ret.second && ret.first->second.key() == val.key())
+                return ValStatus::repeatID;
 
-            auto const ins = current_.emplace(nodeID, val);
+            auto const ins = current_.emplace(key, val);
             if (!ins.second)
             {
                 // Replace existing only if this one is newer
@@ -604,14 +612,14 @@ public:
                     adaptor_.onStale(std::move(oldVal));
                     ins.first->second = val;
                     if (val.trusted())
-                        updateTrie(lock, nodeID, val, old);
+                        updateTrie(lock, key, val, old);
                 }
                 else
                     return ValStatus::stale;
             }
             else if (val.trusted())
             {
-                updateTrie(lock, nodeID, val, boost::none);
+                updateTrie(lock, key, val, boost::none);
             }
         }
         return ValStatus::current;
@@ -710,10 +718,10 @@ public:
                 acquiring_.end(),
                 [](auto const& a, auto const& b) {
                     std::pair<Seq, ID> const& aKey = a.first;
-                    typename hash_set<NodeID>::size_type const& aSize =
+                    typename hash_set<NodeKey>::size_type const& aSize =
                         a.second.size();
                     std::pair<Seq, ID> const& bKey = b.first;
-                    typename hash_set<NodeID>::size_type const& bSize =
+                    typename hash_set<NodeKey>::size_type const& bSize =
                         b.second.size();
                     // order by number of trusted peers validating that ledger
                     // break ties with ledger ID
@@ -811,7 +819,7 @@ public:
 
         @param ledger The working ledger
         @param ledgerID The preferred ledger
-        @return The number of current trusted validators working on a descendant
+        @return The number of current trusted validators working on a descendent
                 of the preferred ledger
 
         @note If ledger.id() != ledgerID, only counts immediate child ledgers of
@@ -851,26 +859,26 @@ public:
         current(
             lock,
             [&](std::size_t numValidations) { ret.reserve(numValidations); },
-            [&](NodeID const&, Validation const& v) {
+            [&](NodeKey const&, Validation const& v) {
                 if (v.trusted() && v.full())
                     ret.push_back(v.unwrap());
             });
         return ret;
     }
 
-    /** Get the set of node ids associated with current validations
+    /** Get the set of known public keys associated with current validations
 
-        @return The set of node ids for active, listed validators
+        @return The set of known keys for current listed validators
     */
-    auto
-    getCurrentNodeIDs() -> hash_set<NodeID>
+    hash_set<NodeKey>
+    getCurrentPublicKeys()
     {
-        hash_set<NodeID> ret;
+        hash_set<NodeKey> ret;
         ScopedLock lock{mutex_};
         current(
             lock,
             [&](std::size_t numValidations) { ret.reserve(numValidations); },
-            [&](NodeID const& nid, Validation const&) { ret.insert(nid); });
+            [&](NodeKey const& k, Validation const&) { ret.insert(k); });
 
         return ret;
     }
@@ -889,7 +897,7 @@ public:
             lock,
             ledgerID,
             [&](std::size_t) {},  // nothing to reserve
-            [&](NodeID const&, Validation const& v) {
+            [&](NodeKey const&, Validation const& v) {
                 if (v.trusted() && v.full())
                     ++count;
             });
@@ -910,12 +918,33 @@ public:
             lock,
             ledgerID,
             [&](std::size_t numValidations) { res.reserve(numValidations); },
-            [&](NodeID const&, Validation const& v) {
+            [&](NodeKey const&, Validation const& v) {
                 if (v.trusted() && v.full())
                     res.emplace_back(v.unwrap());
             });
 
         return res;
+    }
+
+    /** Return the sign times of all trusted full validations
+
+        @param ledgerID The identifier of ledger of interest
+        @return Vector of times
+    */
+    std::vector<NetClock::time_point>
+    getTrustedValidationTimes(ID const& ledgerID)
+    {
+        std::vector<NetClock::time_point> times;
+        ScopedLock lock{mutex_};
+        byLedger(
+            lock,
+            ledgerID,
+            [&](std::size_t numValidations) { times.reserve(numValidations); },
+            [&](NodeKey const&, Validation const& v) {
+                if (v.trusted() && v.full())
+                    times.emplace_back(v.signTime());
+            });
+        return times;
     }
 
     /** Returns fees reported by trusted full validators in the given ledger
@@ -933,7 +962,7 @@ public:
             lock,
             ledgerID,
             [&](std::size_t numValidations) { res.reserve(numValidations); },
-            [&](NodeID const&, Validation const& v) {
+            [&](NodeKey const&, Validation const& v) {
                 if (v.trusted() && v.full())
                 {
                     boost::optional<std::uint32_t> loadFee = v.loadFee();
@@ -951,7 +980,7 @@ public:
     void
     flush()
     {
-        hash_map<NodeID, Validation> flushed;
+        hash_map<NodeKey, Validation> flushed;
         {
             ScopedLock lock{mutex_};
             for (auto it : current_)

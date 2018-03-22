@@ -19,6 +19,7 @@
 
 #include <BeastConfig.h>
 #include <ripple/basics/strHex.h>
+#include <ripple/protocol/Seed.h>
 #include <ripple/protocol/SecretKey.h>
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/impl/secp256k1.h>
@@ -297,12 +298,24 @@ template <>
 boost::optional<SecretKey>
 parseBase58 (TokenType type, std::string const& s)
 {
-    auto const result = decodeBase58Token(s, type);
+    auto result = decodeBase58Token(s, type);
     if (result.empty())
         return boost::none;
-    if (result.size() != 32)
+    if (result.size() != 32 && (type == TokenType::TOKEN_ACCOUNT_WIF && result.size() != 33))
         return boost::none;
+    if (type == TokenType::TOKEN_ACCOUNT_WIF)
+        result.pop_back();
     return SecretKey(makeSlice(result));
+}
+
+template<>
+boost::optional<SecretKey>
+parseHex (std::string const& str)
+{
+    uint256 secret;
+    if (secret.SetHexExact (str))
+        return SecretKey(Slice(secret.data(), secret.size()));
+    return boost::none;
 }
 
 } // ripple

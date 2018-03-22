@@ -341,13 +341,15 @@ public:
     {
         (void)buffers;
 #if BEAST_STATSDCOLLECTOR_TRACING_ENABLED
+        std::stringstream ss;
         for (auto const& buffer : buffers)
         {
             std::string const s (boost::asio::buffer_cast <char const*> (buffer),
                 boost::asio::buffer_size (buffer));
-            std::cerr << s;
+            ss << s;
         }
-        std::cerr << '\n';
+        //m_journal.trace << std::endl << ss.str ();
+        outputDebugString (ss.str ());
 #endif
     }
 
@@ -375,7 +377,9 @@ public:
             assert (! s.empty ());
             if (! buffers.empty () && (size + length) > max_packet_size)
             {
+#if BEAST_STATSDCOLLECTOR_TRACING_ENABLED
                 log (buffers);
+#endif
                 m_socket.async_send (buffers, std::bind (
                     &StatsDCollectorImp::on_send, this, keepAlive,
                         std::placeholders::_1,
@@ -390,7 +394,9 @@ public:
 
         if (! buffers.empty ())
         {
+#if BEAST_STATSDCOLLECTOR_TRACING_ENABLED
             log (buffers);
+#endif
             m_socket.async_send (buffers, std::bind (
                 &StatsDCollectorImp::on_send, this, keepAlive,
                     std::placeholders::_1,

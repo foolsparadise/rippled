@@ -182,19 +182,12 @@ void
 LedgerMaster::setValidLedger(
     std::shared_ptr<Ledger const> const& l)
 {
-
     std::vector <NetClock::time_point> times;
-    boost::optional<uint256> consensusHash;
 
     if (! standalone_)
     {
-        auto const vals = app_.getValidations().getTrustedForLedger(l->info().hash);
-        times.reserve(vals.size());
-        for(auto const& val: vals)
-            times.push_back(val->getSignTime());
-
-        if(!vals.empty())
-            consensusHash = vals.front()->getConsensusHash();
+        times = app_.getValidations().getTrustedValidationTimes(
+            l->info().hash);
     }
 
     NetClock::time_point signTime;
@@ -223,7 +216,7 @@ LedgerMaster::setValidLedger(
 
     app_.getOPs().updateLocalTx (*l);
     app_.getSHAMapStore().onLedgerClosed (getValidatedLedger());
-    mLedgerHistory.validatedLedger (l, consensusHash);
+    mLedgerHistory.validatedLedger (l);
     app_.getAmendmentTable().doValidatedLedger (l);
     if (!app_.getOPs().isAmendmentBlocked() &&
         app_.getAmendmentTable().hasUnsupportedEnabled ())
@@ -811,9 +804,7 @@ LedgerMaster::checkAccept (
 /** Report that the consensus process built a particular ledger */
 void
 LedgerMaster::consensusBuilt(
-    std::shared_ptr<Ledger const> const& ledger,
-    uint256 const& consensusHash,
-    Json::Value consensus)
+    std::shared_ptr<Ledger const> const& ledger, Json::Value consensus)
 {
 
     // Because we just built a ledger, we are no longer building one
@@ -823,7 +814,7 @@ LedgerMaster::consensusBuilt(
     if (standalone_)
         return;
 
-    mLedgerHistory.builtLedger (ledger, consensusHash, std::move (consensus));
+    mLedgerHistory.builtLedger (ledger, std::move (consensus));
 
     if (ledger->info().seq <= mValidLedgerSeq)
     {

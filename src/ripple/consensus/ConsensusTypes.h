@@ -169,7 +169,7 @@ public:
 
     The initial consensus proposal from each peer has that peer's view of
     when the ledger closed.  This object stores all those close times for
-    analysis of clock drift between peers.
+    analysis of clock drift between peerss.
 */
 struct ConsensusCloseTimes
 {
@@ -210,13 +210,13 @@ struct ConsensusResult
     using Dispute_t = DisputedTx<Tx_t, NodeID_t>;
 
     ConsensusResult(TxSet_t&& s, Proposal_t&& p)
-        : txns{std::move(s)}, position{std::move(p)}
+        : set{std::move(s)}, position{std::move(p)}
     {
-        assert(txns.id() == position.position());
+        assert(set.id() == position.position());
     }
 
     //! The set of transactions consensus agrees go in the ledger
-    TxSet_t txns;
+    TxSet_t set;
 
     //! Our proposed position on transactions/close time
     Proposal_t position;
