@@ -71,6 +71,7 @@ public:
     // Does not sign the validation
     STValidation (
                   uint256 const& ledgerHash,
+                  uint256 const& consensusHash,
                   NetClock::time_point signTime,
                   PublicKey const& raPub,
                   bool isFull);
@@ -88,6 +89,9 @@ public:
     }
     
     uint256         getLedgerHash ()     const;
+    // Hash of consensus transaction set used to generate ledger
+    uint256
+    getConsensusHash() const;
     NetClock::time_point getSignTime ()  const;
     NetClock::time_point getSeenTime ()  const;
     std::uint32_t   getFlags ()          const;
