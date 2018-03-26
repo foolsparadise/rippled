@@ -210,13 +210,13 @@ struct ConsensusResult
     using Dispute_t = DisputedTx<Tx_t, NodeID_t>;
 
     ConsensusResult(TxSet_t&& s, Proposal_t&& p)
-        : set{std::move(s)}, position{std::move(p)}
+        : txns{std::move(s)}, position{std::move(p)}
     {
-        assert(set.id() == position.position());
+        assert(txns.id() == position.position());
     }
 
     //! The set of transactions consensus agrees go in the ledger
-    TxSet_t set;
+    TxSet_t txns;
 
     //! Our proposed position on transactions/close time
     Proposal_t position;
